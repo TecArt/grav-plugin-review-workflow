@@ -1,0 +1,29 @@
+{% extends 'partials/base-root.html.twig' %}
+
+{% block content_wrapper %}
+    <div class="content-wrapper">
+        <div class="{% if config.plugins.admin.content_padding %}content-padding{% endif %}">
+            {% block messages %}
+                {% include 'partials/messages.html.twig' %}
+            {% endblock %}
+
+            {% block widgets %}{% endblock %}
+            <div class="default-box-shadow">
+                {% block content_top %}{% endblock %}
+                <div class="admin-block">
+                    {%- block content %}{% endblock -%}
+                </div>
+                {% if config.plugins.admin.show_github_msg %}
+                <div class="notice alert">TecArt Werbung</div>
+                {% endif %}
+                {% block content_bottom %}{% endblock %}
+            </div>
+            {% block footer %}
+                <footer id="footer">
+                    TecArt Footer
+                </footer>
+            {% endblock %}
+        </div>
+    </div>
+{% endblock %}
+

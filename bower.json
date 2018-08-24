@@ -1,0 +1,33 @@
+{
+  "name": "Tecart Review Workflow",
+  "authors": [
+    "Sören Müller <soeren.mueller@tecart.de>"
+  ],
+  "description": "TecArt Review Workflow is a Plugin for the Grav CMS",
+  "main": "tecart-review-workflow.php",
+  "keywords": [
+    "tecart",
+    "crm",
+    "website",
+    "grav",
+    "plugin",
+    "review",
+    "workflow"
+  ],
+  "license": "MIT",
+  "homepage": "http://www.tecart.de",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "codemirror": "^5.37.0",
+    "google-diff-match-patch-js": "^1.0.0",
+    "js-base64": "^2.4.3"
+  }
+}

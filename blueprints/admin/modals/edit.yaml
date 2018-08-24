@@ -1,0 +1,18 @@
+form:
+  validation: loose
+  fields:
+
+    issue_id:
+      type: jira_issues
+      form: 'blueprints'
+      label: 'Jira Vorgang'
+      validate:
+        required: false ## TODO
+        message: 'Bitte wählen Sie einen Jira Vorgang um forzufahren'
+        
+    issue_message:
+      form: 'blueprints'
+      type: hidden
+
+    blueprint:
+      type: blueprint

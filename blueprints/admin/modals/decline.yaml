@@ -1,0 +1,13 @@
+form:
+  validation: loose
+  fields:
+          
+    issue_message:
+      type: ta_textarea
+      form: 'blueprints'
+      label: 'Nachricht'
+      validate:
+        require: true
+
+    blueprint:
+      type: blueprint

@@ -1,0 +1,15 @@
+<div class="modular-row advantages {{ page.header.class}} p-7">
+    {{ content }}
+    <div class="advantage-items">
+        {% for item in page.header.variables.advantages %}
+        <div class="advantage-item">
+            <div class="advantage-icon"></div>
+            <div class="advantage-content">
+                {% if item.text %}
+                <p>{{ item.text|markdown }}</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>

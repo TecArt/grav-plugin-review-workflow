@@ -1,0 +1,119 @@
+rules:
+  slug:
+    pattern: '[a-zA-Zа-яA-Я0-9_\-]+'
+    min: 1
+    max: 200
+
+form:
+  validation: loose
+  fields:
+
+    tabs:
+      type: tabs
+      active: 1
+
+      fields:
+        comparison:
+          type: tab
+          title: PLUGIN_TECART_REVIEW_WORKFLOW.COMPARISON
+          fields:
+
+            header.draft.content:
+              readonly: true
+              type: review
+              label: PLUGIN_TECART_REVIEW_WORKFLOW.REVIEW
+
+        content:
+          type: tab
+          title: PLUGIN_ADMIN.CONTENT
+          fields:
+          
+            frontmatter:
+              classes: frontmatter
+              type: editor
+              label: PLUGIN_ADMIN.FRONTMATTER
+              autofocus: false
+              codemirror:
+                mode: 'yaml'
+                readOnly: nocursor
+                indentUnit: 4
+                autofocus: false
+                indentWithTabs: false
+                lineNumbers: true
+                styleActiveLine: true
+                gutters: ['CodeMirror-lint-markers']
+                lint: true
+                ignore: 'code preview undo redo headers bold italic strike delimiter link image blockquote listUl listOl'
+
+            content:
+              type: markdown
+              codemirror:
+                readOnly: nocursor
+                ignore: 'code preview undo redo headers bold italic strike delimiter link image blockquote listUl listOl'
+        
+        options:
+          type: tab
+          title: PLUGIN_ADMIN.OPTIONS
+
+          fields:
+
+            columns:
+              type: columns
+
+              fields:
+                column1:
+                  type: column
+
+                  fields:
+
+                    ordering:
+                      type: toggle
+                      readonly: true
+                      label: PLUGIN_ADMIN.FOLDER_NUMERIC_PREFIX
+                      help: PLUGIN_ADMIN.FOLDER_NUMERIC_PREFIX_HELP
+                      highlight: 1
+                      options:
+                        1: PLUGIN_ADMIN.ENABLED
+                        0: PLUGIN_ADMIN.DISABLED
+                      validate:
+                        type: bool
+
+                    folder:
+                      type: text
+                      readonly: true
+                      label: PLUGIN_ADMIN.FOLDER_NAME
+                      help: PLUGIN_ADMIN.FOLDER_NAME_HELP
+                      validate:
+                        rule: slug
+                        required: true
+
+                    route:
+                      type: text
+                      readonly: true
+                      label: PLUGIN_ADMIN.PARENT
+                      classes: fancy
+                      validate:
+                        required: true
+
+                    name:
+                      type: text
+                      readonly: true
+                      classes: fancy
+                      label: PLUGIN_ADMIN.DISPLAY_TEMPLATE
+                      help: PLUGIN_ADMIN.DISPLAY_TEMPLATE_HELP
+                      default: default
+                      data-options@: '\Grav\Plugin\AdminPlugin::pagesTypes'
+                      validate:
+                        required: true
+
+                column2:
+                    type: column
+
+                    fields:
+                      order:
+                        type: order
+                        readonly: true
+                        label: PLUGIN_ADMIN.ORDERING
+
+            blueprint:
+              type: blueprint

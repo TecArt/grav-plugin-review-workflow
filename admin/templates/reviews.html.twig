@@ -1,0 +1,130 @@
+{% extends 'partials/base.html.twig' %}
+
+{% if admin.route %}
+    {% set context = admin.page(true) %}
+{% endif %}
+
+{% block titlebar %}
+  <div class="button-bar">
+    <a class="button" href="{{ base_url }}"><i class="fa fa-reply"></i> {{ "PLUGIN_ADMIN.BACK"|tu }}</a>
+  </div>
+  <h1><i class="fa fa-fw fa-tasks"></i> Reviews</h1>
+{% endblock %}
+
+{% macro loop(page, depth, twig_vars) %}
+    {% set separator = twig_vars['config'].system.param_sep %}
+    {% set display_field = twig_vars['config'].plugins.admin.pages_list_display_field %}
+    {% set base_url = twig_vars['base_url_relative'] %}
+    {% set base_url_relative_frontend = twig_vars['base_url_relative_frontend'] %}
+    {% set base_url_simple = twig_vars['base_url_simple'] %}
+    {% set admin_route = twig_vars['admin_route'] %}
+    {% set admin_lang = twig_vars['admin_lang'] %}
+    {% set warn = twig_vars['warn'] %}
+    {% set uri = twig_vars['uri'] %}
+    {% set user = grav.admin.user.username %}
+
+    {% if page.header.admin.children_display_order == 'collection' and page.header.content.order.by %}
+        {% if page.header.content.order.custom %}
+            {% set pcol = page.children().order(page.header.content.order.by, page.header.content.order.dir|default('asc'), page.header.content.order.custom) %}
+        {% else %}
+            {% set pcol = page.children().order(page.header.content.order.by, page.header.content.order.dir|default('asc')) %}
+        {% endif %}
+    {% else %}
+        {% set pcol = page.children() %}
+    {% endif %}
+
+    {% for p in pcol %}
+        {% set description = (not p.page ? "PLUGIN_ADMIN.FOLDER"|tu ~ ' &bull; ' : "PLUGIN_ADMIN.PAGE"|tu ~ ' &bull; ') ~
+                             (p.modular ? "PLUGIN_ADMIN.MODULAR"|tu ~ ' &bull; ' : '') ~
+                             (p.routable ? "PLUGIN_ADMIN.ROUTABLE"|tu ~ ' &bull; ' : "PLUGIN_ADMIN.NON_ROUTABLE"|tu ~ ' &bull; ') ~
+                             (p.visible ? "PLUGIN_ADMIN.VISIBLE"|tu ~ ' &bull; ' : "PLUGIN_ADMIN.NON_VISIBLE"|tu ~ ' &bull; ') ~
+                             (p.published ? "PLUGIN_ADMIN.PUBLISHED"|tu ~ ' &bull; ' : "PLUGIN_ADMIN.NON_PUBLISHED"|tu ~ ' &bull; ') %}
+
+        {% set page_url = getPageUrl(p) %}
+        {% set assignee = p.header.draft.assignee %}
+        {% set transition = p.header.draft.transition %}
+
+        {% if transition == 'review' and user == assignee %}
+        <li class="page-item" data-nav-id="{{ p.route }}">
+            <div class="row page-item__row">        
+                <span class="page-item__toggle" {{ p.children(0).count > 0 ? 'data-toggle="children"' : ''}}>
+                    <i class="page-icon fa fa-fw fa-circle-o {{ p.children(0).count > 0 ? 'children-closed' : ''}} {{ p.modular ? 'modular' : (not p.routable ? 'not-routable' : (not p.visible ? 'not-visible' : (not p.page ? 'folder' :  ''))) }}"></i>
+                </span>
+                <div class="page-item__content">
+                    <div class="page-item__content-name">
+                        <span data-hint="{{ description|trim(' &bull; ')|raw }}" class="hint--top page-item__content-hint">
+                            {% set page_label = attribute(p.header, display_field)|defined(attribute(p, display_field))|defined(p.title) %}
+                            <a href="{{ page_url }}" class="page-edit">{{ page_label|e }}</a>
+                        </span>
+                        {% if p.language %}
+                            <span class="badge lang {% if p.language == admin_lang %}info{% endif %}">{{p.language}}</span>
+                        {% endif %}
+                        {% if p.home %}
+                            <span class="page-home"><i class="fa fa-home"></i></span>
+                        {% endif %}
+                    </div>
+                    <p class="page-route">{{ p.header.routes.default ?: p.route }} <span class="spacer"><i class="fa fa-long-arrow-right"></i></span> {{ p.template() }}</p>
+                </div>
+                <span class="page-item__tools">
+                    {% if transition == 'edit' or transition == 'new' or transition == 'save' %}
+                        {% if last_modified_by == user %}
+                            <a href="{{ page_url }}"><i class="fa fa-fw fa-edit" title="Bearbeiten"></i></a>
+                        {% else %}
+                            <i class="fa fa-fw fa-edit" title="Wird bearbeitet"></i>
+                        {% endif %}
+                    {% elseif transition == 'review' %}
+                        {% if assignee == user %}
+                            <a href="{{ page_url }}"><i class="fa fa-fw fa-flag-checkered" title="Überprüfen"></i></a>
+                        {% else %}
+                            <i class="fa fa-fw fa-flag-checkered" title="Zur Überprüfung"></i>
+                        {% endif %}
+                    {% endif %}
+                    {% if transition == 'decline' %}
+                        <a href="{{ page_url }}"><i class="fa fa-fw fa-exclamation-triangle" title="Zu bearbeiten"></i></a>
+                    {% endif %}
+                    {% if transition == 'commit' %}
+                        <a href="{{ page_url }}"><i class="fa fa-fw fa-cloud" title="Zu bearbeiten"></i></a>
+                    {% endif %}
+                    {% if not transition %}
+                        <a href="{{ page_url }}"><i class="fa fa-fw fa-globe" title="Öffentlich"></i></a>
+                    {% endif %}
+                    {% if config.plugins.admin.frontend_preview_target != 'inline' %}
+                        {% set preview_target = config.plugins.admin.frontend_pages_target %}
+                        {% set preview_html = (base_url_relative_frontend|rtrim('/') ~ (p.home ? '' : p.route)) ?: '/' %}
+                        {% set preview_link = p.routable ? '<a class="page-view" target="' ~ preview_target ~ '" href="' ~ preview_html ~ '" title="' ~ "PLUGIN_ADMIN.PREVIEW"|tu ~ '"><i class="fa fa-fw fa-eye"></i></a>' : '<i class="fa fa-fw fa-eye"></i>' %}
+                    {% else %}
+                        {% set preview_html = (base_url|rtrim('/') ~ '/preview' ~ (p.home ? '' : p.route)) ?: '/' %}
+                        {% set preview_link = p.routable ? '<a class="page-view" href="' ~ preview_html ~ '" title="' ~ "PLUGIN_ADMIN.PREVIEW"|tu ~ '"> <i class="fa fa-fw fa-eye"></i></a>' : '' %}
+                    {% endif %}
+                    {{ preview_link|raw }}
+                </span>
+            </div>   
+        </li>
+        {% endif %}
+        
+        {% if p.children().count > 0 %}   
+            {{ _self.loop(p, depth, twig_vars) }}
+        {% endif %}
+    {% endfor %}
+{% endmacro %}
+
+{% block content %}
+  <form id="page-filtering">
+    <div class="page-filters">
+        <input type="text" data-filter-labels="{{ [{'id': 'mode', 'name': 'PLUGIN_ADMIN.PAGE_MODES'|tu}, {'id': 'type', 'name': 'PLUGIN_ADMIN.PAGE_TYPES'|tu}, {'id': 'access', 'name': 'PLUGIN_ADMIN.ACCESS_LEVELS'|tu}] |json_encode|e('html_attr')}}" data-filter-types="{{ admin.types|merge(admin.modularTypes)|json_encode|e('html_attr') }}" data-filter-access-levels="{{ admin.accessLevels|json_encode|e('html_attr') }}" placeholder="{{ "PLUGIN_ADMIN.ADD_FILTERS"|tu }}" class="page-filter" name="page-filter" />
+    </div>
+    <div class="page-search">
+        <input type="text" placeholder="{{ "PLUGIN_ADMIN.SEARCH_PAGES"|tu }}" name="page-search" />
+    </div>
+    <div class="page-shortcuts">
+        <span class="button button-x-small" data-page-toggleall="expand"><i class="fa fa-fw fa-plus-circle"></i> {{ "PLUGIN_ADMIN.EXPAND_ALL"|tu }}</span>
+        <span class="button button-x-small" data-page-toggleall="collapse"><i class="fa fa-fw fa-minus-circle"></i> {{ "PLUGIN_ADMIN.COLLAPSE_ALL"|tu }}</span>
+    </div>
+</form>
+<div class="pages-list">
+    <ul class="depth-0">
+        {{ _self.loop(pages, 0, _context) }}
+    </ul>
+    {% include 'partials/page-legend.html.twig' %}
+</div>
+{% endblock %}

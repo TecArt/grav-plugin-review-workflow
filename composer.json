@@ -1,0 +1,19 @@
+{
+    "name": "soeren/tecart-review-workflow",
+    "description": "TecArt Review Workflow Plugin for Grav CMS",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Sören Müller",
+            "email": "soeren.mueller@tecart.de"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Grav\\Plugin\\TecartReviewWorkflow\\": "classes/"
+        }
+    },
+    "require": {
+        "defuse/php-encryption": "^2.0"
+    }
+}

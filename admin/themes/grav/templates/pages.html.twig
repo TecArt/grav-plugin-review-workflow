@@ -1,0 +1,744 @@
+{% extends 'partials/base.html.twig' %}
+
+{% macro spanToggle(input, length) %}
+    {{ (repeat('&nbsp;&nbsp;', (length - input|length) / 2) ~ input ~ repeat('&nbsp;&nbsp;', (length - input|length) / 2))|raw }}
+{% endmacro %}
+
+{##}
+{### Set context variable #}
+{##}
+
+{% if admin.route %}
+    {% set context = admin.page(true) %}
+{% endif %}
+
+{##}
+{### Set page modes #}
+{##}
+
+{% if uri.param('new') %}
+    {% set mode = 'new' %}
+{%  elseif context %}
+
+    {# Set page variables #}
+    {% set git = config.plugins['git-sync'].enabled %}
+    {% set jira = config.plugins['tecart-jira-connector'].enabled %}
+
+    {% set issue_id = context.header.draft.issue.id %}
+    {% set issue_summary = '' %}  
+    {% for issue in grav.twig.issues %}
+        {% if context.header.draft.issue.id == issue.key %}
+            {% set issue_summary = issue.fields.summary %}
+        {% endif %}
+    {% endfor %}
+
+    {% set transition = context.header.draft.transition %}
+    {% set assignee = context.header.draft.assignee %}
+    {% set last_modified_by = context.header.draft.last_modified_by %}
+    {% set user = grav.admin.user.username %}
+
+    {% if context.exists %}
+        {% set page_url = base_url ~ '/pages' ~ (context.header.routes.default ?: context.rawRoute) %}
+        {% set exists = true %}
+        {% set title = (context.exists ? "PLUGIN_ADMIN.EDIT"|tu : "PLUGIN_ADMIN.CREATE"|tu ) ~ " " ~ (context.header.review.title ?: context.review.title) %}
+    {% else %}
+        {% set title = "PLUGIN_ADMIN.ADD_PAGE"|tu %}
+    {% endif %}
+
+    {# Set locked modes #}
+    {% if transition == 'new' or transition == 'save' or transition == 'edit' or transition == 'continue' %}
+        {% if last_modified_by == user %}
+            {%  if grav.admin.user.groups %}
+                {% set group_editor = in_array(config.plugins['tecart-review-workflow'].editors, grav.admin.user.groups) %}
+            {% endif %}
+            {% set mode = 'edit' %}
+        {% else %}
+            {% set mode = 'readonly-edit' %}
+        {% endif %}
+    {% elseif transition == 'review' %}
+        {% if assignee == user %}
+            {% set mode = 'review' %}
+        {% else %}
+            {% set mode = 'readonly-review' %}
+        {% endif %}
+    {% elseif transition == 'commit' %}
+        {% set mode = 'open' %}
+    {% else %}
+        {% set mode = 'readonly' %}
+    {% endif %} 
+{% else %}
+    {% set mode = 'list' %}
+    {% set title = "PLUGIN_ADMIN.PAGES"|tu %}
+{% endif %}
+
+{% set modular = context.modular ? 'modular_' : '' %}
+{% set warn = config.plugins.admin.warnings.delete_page %}
+{% set admin_lang = admin.session.admin_lang ?: 'en' %}
+{% set page_lang = context.language %}
+{% set type = 'page' %}
+
+{##}
+{### Assets #}
+{##}
+
+{% block stylesheets %}
+    {% if mode == 'edit' %}
+        {% do assets.addCss(theme_url~'/css/codemirror/codemirror.css') %}
+    {% endif %}
+    {% if mode == 'review' or mode == 'edit' or mode == 'readonly' or mode == 'readonly-edit' or mode == 'readonly-review' or mode == 'open' %}
+        {% do assets.addCss('/user/plugins/tecart-review-workflow/components/codemirror/lib/codemirror.css') %}
+        {% do assets.addCss('/user/plugins/tecart-review-workflow/components/codemirror/addon/merge/merge.css') %}
+        {% do assets.addCss('/user/plugins/tecart-review-workflow/components/codemirror/theme/eclipse.css') %}
+    {% endif %}
+    {{ parent() }}
+    {% if group_editor %}
+        <style type="text/css" rel="stylesheet">.dz-remove {display:none!important}</style>
+    {% endif %}
+{% endblock %}
+
+{% block javascripts %}
+    {% if mode == 'review' or mode == 'edit' or mode == 'readonly' or mode == 'readonly-edit' or mode == 'readonly-review' or mode == 'open' %}
+        {# {% do assets.addJs('/user/plugins/tecart-review-workflow/components/codemirror/lib/codemirror.js') %} // not working #}
+        <script src="/user/plugins/tecart-review-workflow/components/codemirror/lib/codemirror.js"></script>
+        <script src="/user/plugins/tecart-review-workflow/components/codemirror/mode/xml/xml.js"></script>
+        <script src="/user/plugins/tecart-review-workflow/components/codemirror/mode/css/css.js"></script>
+        <script src="/user/plugins/tecart-review-workflow/components/codemirror/mode/javascript/javascript.js"></script>
+        <script src="/user/plugins/tecart-review-workflow/components/codemirror/mode/htmlmixed/htmlmixed.js"></script>
+        <script src="/user/plugins/tecart-review-workflow/components/google-diff-match-patch-js/diff_match_patch.js"></script>
+        <script src="/user/plugins/tecart-review-workflow/components/codemirror/addon/merge/merge.js"></script>
+        <script src="/user/plugins/tecart-review-workflow/components/codemirror/addon/display/autorefresh.js"></script>
+        <script src="/user/plugins/tecart-review-workflow/components/js-base64/base64.min.js"></script>
+    {% endif %}
+
+    {{ parent() }}
+{% endblock %}
+
+{##}
+{### Set preview variables #}
+{##}
+
+{% if config.plugins.admin.frontend_preview_target != 'inline' %}
+    {% set preview_html = (base_url_relative_frontend|rtrim('/') ~ (context.home ? '' : context.route)) ?: '/' %}
+    {% set preview_target = config.plugins.admin.frontend_pages_target %}
+    {% set preview_link = context.routable ? '<a class="button" target="' ~ preview_target ~ '" href="' ~ preview_html ~ '" title="' ~ "PLUGIN_ADMIN.PREVIEW"|tu ~ '"> <i class="fa fa-fw fa-eye" style="font-size:18px;margin-right:0;"></i></a>' : '' %}
+{% else %}
+    {% set preview_html = (base_url|rtrim('/') ~ '/preview' ~ (context.home ? '' : context.route)) ?: '/' %}
+    {% set preview_link = context.routable ? '<a class="button" href="' ~ preview_html ~ '" title="' ~ "PLUGIN_ADMIN.PREVIEW"|tu ~ '"> <i class="fa fa-fw fa-eye" style="font-size:18px;margin-right:0;"></i></a>' : '' %}
+{% endif %}
+
+{##}
+{### Format the list entries #}
+{##}
+
+{% macro loop(page, depth, twig_vars) %}
+    {% set config = twig_vars['config'] %}
+    {% set separator = config.system.param_sep %}
+    {% set display_field = config.plugins.admin.pages_list_display_field %}
+    {% set base_url = twig_vars['base_url_relative'] %}
+    {% set base_url_relative_frontend = twig_vars['base_url_relative_frontend'] %}
+    {% set base_url_simple = twig_vars['base_url_simple'] %}
+    {% set admin_route = twig_vars['admin_route'] %}
+    {% set admin_lang = twig_vars['admin_lang'] %}
+    {% set warn = twig_vars['warn'] %}
+    {% set uri = twig_vars['uri'] %}   
+    {% set user = grav.admin.user.username %}
+
+    {% if page.header.admin.children_display_order == 'collection' and page.header.content.order.by %}
+        {% if page.header.content.order.custom %}
+            {% set pcol = page.children().order(page.header.content.order.by, page.header.content.order.dir|default('asc'), page.header.content.order.custom) %}
+        {% else %}
+            {% set pcol = page.children().order(page.header.content.order.by, page.header.content.order.dir|default('asc')) %}
+        {% endif %}
+    {% else %}
+        {% set pcol = page.children() %}
+    {% endif %}
+
+    {% for p in pcol %}
+        {% set description = (not p.page ? "PLUGIN_ADMIN.FOLDER"|tu ~ ' &bull; ' : "PLUGIN_ADMIN.PAGE"|tu ~ ' &bull; ') ~
+                             (p.modular ? "PLUGIN_ADMIN.MODULAR"|tu ~ ' &bull; ' : '') ~
+                             (p.routable ? "PLUGIN_ADMIN.ROUTABLE"|tu ~ ' &bull; ' : "PLUGIN_ADMIN.NON_ROUTABLE"|tu ~ ' &bull; ') ~
+                             (p.visible ? "PLUGIN_ADMIN.VISIBLE"|tu ~ ' &bull; ' : "PLUGIN_ADMIN.NON_VISIBLE"|tu ~ ' &bull; ') ~
+                             (p.published ? "PLUGIN_ADMIN.PUBLISHED"|tu ~ ' &bull; ' : "PLUGIN_ADMIN.NON_PUBLISHED"|tu ~ ' &bull; ') %}
+
+        {% set page_url = getPageUrl(p) %}
+
+        {% set transition = p.header.draft.transition %}
+        {% set assignee = p.header.draft.assignee %}
+        {% set last_modified_by = p.header.draft.last_modified_by %}
+
+
+        <li class="page-item" data-nav-id="{{ p.route }}">
+            <div class="row page-item__row">
+                <span class="page-item__toggle" {{ p.children(0).count > 0 ? 'data-toggle="children"' : ''}}>
+                    <i class="page-icon fa fa-fw fa-circle-o {{ p.children(0).count > 0 ? 'children-closed' : ''}} {{ p.modular ? 'modular' : (not p.routable ? 'not-routable' : (not p.visible ? 'not-visible' : (not p.page ? 'folder' :  ''))) }}"></i>
+                </span>
+                <div class="page-item__content">
+                    <div class="page-item__content-name">
+                        <span data-hint="{{ description|trim(' &bull; ')|raw }}" class="hint--top page-item__content-hint">
+                            {% set page_label = attribute(p.header, display_field)|defined(attribute(p, display_field))|defined(p.title) %}
+                            <a href="{{ page_url }}" class="page-edit">{{ page_label|e }}</a>
+                        </span>
+                        {% if p.language %}
+                            <span class="badge lang {% if p.language == admin_lang %}info{% endif %}">{{p.language}}</span>
+                        {% endif %}
+                        {% if p.home %}
+                            <span class="page-home"><i class="fa fa-home"></i></span>
+                        {% endif %}
+                    </div>
+                    <p class="page-route">{{ p.header.routes.default ?: p.route }} <span class="spacer"><i class="fa fa-long-arrow-right"></i></span> {{ p.template() }}</p>
+                </div>
+                <span class="page-item__tools">
+                    {% if config.plugins.admin.frontend_preview_target != 'inline' %}
+                        {% set preview_target = config.plugins.admin.frontend_pages_target %}
+                        {% set preview_html = (base_url_relative_frontend|rtrim('/') ~ (p.home ? '' : p.route)) ?: '/' %}
+                        {% set preview_link = p.routable ? '<a class="page-view" target="' ~ preview_target ~ '" href="' ~ preview_html ~ '" title="' ~ "PLUGIN_ADMIN.PREVIEW"|tu ~ '"> <i class="fa fa-fw fa-eye"></i></a>' : '' %}
+                    {% else %}
+                        {% set preview_html = (base_url|rtrim('/') ~ '/preview' ~ (p.home ? '' : p.route)) ?: '/' %}
+                        {% set preview_link = p.routable ? '<a class="page-view" href="' ~ preview_html ~ '" title="' ~ "PLUGIN_ADMIN.PREVIEW"|tu ~ '"> <i class="fa fa-fw fa-eye"></i></a>' : '' %}
+                    {% endif %}
+                    {{ preview_link|raw }}
+
+                    {% if transition == 'edit' or transition == 'new' or transition == 'save' or transition == 'continue' %}
+                        {% if last_modified_by == user %}
+                            <a href="{{ page_url }}"><i class="fa fa-fw fa-edit" title="Bearbeiten"></i></a>
+                        {% else %}
+                            <i class="fa fa-fw fa-edit" title="Wird bearbeitet"></i>
+                        {% endif %}
+                    {% elseif transition == 'review' %}
+                        {% if assignee == user %}
+                            <a href="{{ page_url }}"><i class="fa fa-fw fa-flag-checkered" title="Überprüfen"></i></a>
+                        {% else %}
+                            <i class="fa fa-fw fa-flag-checkered" title="Zur Überprüfung"></i>
+                        {% endif %}
+                    {% endif %}
+                    {% if transition == 'decline' %}
+                        <a href="{{ page_url }}"><i class="fa fa-fw fa-exclamation-triangle" title="Unerledigt"></i></a>
+                    {% endif %}
+                    {% if transition == 'commit' %}
+                        <a href="{{ page_url }}"><i class="fa fa-fw fa-cloud" title="Unerledigt"></i></a>
+                    {% endif %}
+                    {% if not transition %}
+                        <a href="{{ page_url }}"><i class="fa fa-fw fa-globe" title="Öffentlich"></i></a>
+                    {% endif %}
+                </span>
+            </div>
+            {% if p.children().count > 0 %}
+                <ul class="depth-{{ depth + 1 }}" style="display:none;">
+                    {{ _self.loop(p, depth + 1, twig_vars) }}
+                </ul>
+            {% endif %}
+        </li>
+    {% endfor %}
+{% endmacro %}
+
+{##}
+{### Set titlebars #}
+{##}
+
+{% block titlebar %}
+    <div class="button-bar">
+        {% if mode == 'list' %} {# list titlebar #}
+            
+            <a class="button" href="{{ base_url }}"><i class="fa fa-reply"></i> {{ "PLUGIN_ADMIN.BACK"|tu }}</a>
+
+            {% for key, add_modal in config.plugins.admin.add_modals %}
+                {% if add_modal.show_in|defined('bar') == 'bar' %}
+                    <a class="button {{ add_modal.link_classes }}" href="#modal-add_modal-{{ key }}" data-remodal-target="modal-add_modal-{{ key }}"><i class="fa fa-plus"></i> {{ add_modal.label|tu }}</a>
+                {% endif %}
+            {% endfor %}
+
+            <div class="button-group">
+                <button type="button" class="button disabled" href="#modal" data-remodal-target="modal">
+                    <i class="fa fa-plus"></i> {{ "PLUGIN_ADMIN.ADD"|tu }}
+                </button>
+                <button type="button" class="button dropdown-toggle" data-toggle="dropdown">
+                    <i class="fa fa-caret-down"></i>
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="button" href="#modal" data-remodal-target="modal">{{ "PLUGIN_ADMIN.ADD_PAGE"|tu }}</a></li>
+                    <li><a class="button" href="#modal-folder" data-remodal-target="modal-folder">{{ "PLUGIN_ADMIN.ADD_FOLDER"|tu }}</a></li>
+                    {% if admin.modularTypes is not empty %}
+                        <li><a class="button" href="#modular" data-remodal-target="modular">{{ "PLUGIN_ADMIN.ADD_MODULAR"|tu }}</a></li>
+                    {% endif %}
+                    {% for key, add_modal in config.plugins.admin.add_modals %}
+                        {% if add_modal.show_in|defined('bar') == 'dropdown' %}
+                            <li><a class="button {{ add_modal.link_classes }}" href="#modal-add_modal-{{ key }}" data-remodal-target="modal-add_modal-{{ key }}">{{ add_modal.label|tu }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+
+            {% if admin.multilang %}
+                <div class="button-group">
+                    <button type="button" class="button disabled">
+                        <i class="fa fa-flag-o"></i>
+                        {% set langName = admin.siteLanguages[admin_lang] %}
+                        {{ langName[:1]|upper ~ langName[1:] }}
+                    </button>
+                    {%  if admin.languages_enabled|length > 1 %}
+                    <button type="button" class="button dropdown-toggle" data-toggle="dropdown">
+                        <i class="fa fa-caret-down"></i>
+                    </button>
+                    <ul class="dropdown-menu language-switcher">
+                        {% for langCode in admin.languages_enabled %}
+                            {% set langName = admin.siteLanguages[langCode] %}
+                            {% if langCode != admin_lang %}
+                                <li><a href="{{ uri.addNonce(base_url_relative ~ theme.slug ~ '/pages/task' ~ config.system.param_sep ~ 'switchlanguage/lang' ~ config.system.param_sep ~ langCode, 'admin-form', 'admin-nonce') }}">{{ langName[:1]|upper ~ langName[1:] }}</a></li>
+                            {% endif %}
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                </div>
+            {% endif %}
+
+        {% elseif mode == 'readonly' %} {# readonly titlebar #}
+        
+            {{ preview_link|raw }}
+
+            <div class="button-group">
+                <button class="button" href="#modal-continue" data-remodal-target="modal-continue" title="{{ "PLUGIN_TECART_REVIEW_WORKFLOW.BACK_TO_EDIT_MODE"|tu }}"><i class="fa fa-flag-edit"></i> {{ "Seite bearbeiten"|tu }}</button>
+            </div>
+            <input type="text" id="fireTransition" name="data[fireTransition]" form="blueprints" value="" style="display: none" />
+
+        {% elseif mode == 'open' %}
+        
+            {{ preview_link|raw }}
+
+            <div class="button-group">
+                <button class="button" href="#modal-continue" data-remodal-target="modal-continue" title="{{ "PLUGIN_TECART_REVIEW_WORKFLOW.BACK_TO_EDIT_MODE"|tu }}"><i class="fa fa-flag-edit"></i> {{ "Seite bearbeiten"|tu }}</button>
+            </div>
+            <input type="text" id="fireTransition" name="data[fireTransition]" form="blueprints" value="" style="display: none" />
+            
+        {% elseif mode == 'readonly-edit' %} {# edit-readonly titlebar #}
+            
+            {{ preview_link|raw }}
+
+        {% elseif mode == 'readonly-review' %} {# review-readonly titlebar #}
+
+            {{ preview_link|raw }}
+
+            <div class="button-group">
+                <button onclick="document.getElementById('fireTransition').value = 'decline'" class="button" name="task" value="save" form="blueprints" type="submit" title="{{ "PLUGIN_TECART_REVIEW_WORKFLOW.BACK_TO_EDIT_MODE"|tu }}"><i class="fa fa-flag-checkered"></i> {{ "PLUGIN_TECART_REVIEW_WORKFLOW.ABORT_REVIEW"|tu }}</button>
+            </div>
+            <input type="text" id="fireTransition" name="data[fireTransition]" form="blueprints" value="" style="display: none" />
+
+        {% elseif mode == 'edit' %} {# edit titlebar #}
+
+            {{ preview_link|raw }}
+
+            {% if exists %}
+                <div class="button-group">
+                    <button type="button" class="button dropdown-toggle" data-toggle="dropdown" title="{{ "PLUGIN_TECART_REVIEW_WORKFLOW.ACTIONS"|tu }}">
+                        <i class="fa fa-star"></i> {{ "PLUGIN_TECART_REVIEW_WORKFLOW.ACTIONS"|tu }} <i class="fa fa-caret-down"></i>
+                    </button>
+                    <ul class="dropdown-menu">
+                        {%  if not group_editor %}
+                        <li>
+                            <a class="button disable-after-click" href="{{ uri.addNonce(page_url ~ '/task' ~ config.system.param_sep ~ 'copy', 'admin-form', 'admin-nonce') }}" class="page-copy" >
+                                <i class="fa fa-copy"></i> {{ "PLUGIN_ADMIN.COPY"|tu }}
+                            </a>
+                        </li>
+                        <li>
+                            <a class="button" href="#" data-remodal-target="move">
+                                <i class="fa fa-arrows"></i> {{ "PLUGIN_ADMIN.MOVE"|tu }}
+                            </a>
+                        </li>
+                        {% if config.plugins['admin-pro'].enabled %}
+                            <li>
+                                <a class="button" href="#" data-remodal-target="revisions">
+                                    <i class="fa fa-history"></i> {{ "PLUGIN_ADMIN_PRO.REVISIONS"|tu }}
+                                </a>   
+                            </li>
+                        {% endif %}
+                        {% if warn %}
+                            <li>
+                                <a class="button" href="#delete" data-remodal-target="delete" data-delete-url="{{ uri.addNonce(page_url ~ '/task' ~ config.system.param_sep ~ 'delete', 'admin-form', 'admin-nonce') }}">
+                                    <i class="fa fa-close"></i> {{ "PLUGIN_ADMIN.DELETE"|tu }}
+                                </a>
+                            </li>
+                        {% else %}
+                            <li>
+                                <a class="button disable-after-click" href="{{ uri.addNonce(uri.route(true) ~ '/task' ~ config.system.param_sep ~ 'delete', 'admin-form', 'admin-nonce') }}" class="page-delete" >
+                                    <i class="fa fa-close"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+                        {% endif %}
+
+                        <li>
+                            <a class="button" href="#" data-remodal-target="modal-reset">
+                                <i class="fa fa-exclamation-circle"></i> {{ "PLUGIN_TECART_REVIEW_WORKFLOW.RESET"|tu }}
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                {% if jira %}
+                    <button onclick="document.getElementById('fireTransition').value = 'commit'" class="button" name="task" value="save" form="blueprints" type="submit"><i class="fa fa-cloud"></i> {{ "Einchecken"|tu }}</button>
+                {% endif %}
+
+            {% endif %}
+
+            <div class="button-group">
+                <button onclick="document.getElementById('fireTransition').value = 'save'" class="button" name="task" value="save" form="blueprints" type="submit"><i class="fa fa-save"></i> {{ "PLUGIN_ADMIN.SAVE"|tu }}</button>
+                {% if exists and admin.multilang %}
+                    {% if context.untranslatedLanguages %}
+                        <button type="button" class="button dropdown-toggle" data-toggle="dropdown">
+                            <i class="fa fa-caret-down"></i>
+                        </button>
+                        <ul class="dropdown-menu lang-switcher">
+                            {% for langCode in context.untranslatedLanguages %}
+                                {% set langName = admin.siteLanguages[langCode] %}
+                                {% if langCode != page_lang %}
+                                    <li>
+                                        <button class="button task" name="task" value="saveas" lang="{{langCode}}" form="blueprints" type="submit">
+                                            {{ "PLUGIN_ADMIN.SAVE_AS"|tu }} {{ langName[:1]|upper ~ langName[1:] }}
+                                        </button>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                {% endif %}
+            </div>
+
+            {% if exists and jira %}
+                <button class="button" href="#modal-review" data-remodal-target="modal-review" title="{{ "PLUGIN_TECART_REVIEW_WORKFLOW.SAVE_FOR_REVIEW"|tu }}"><i class="fa fa-fw fa-flag-checkered" style="font-size:16px;margin-right:0;"></i></button>           
+            {% endif %}
+
+            <input type="text" id="fireTransition" name="data[fireTransition]" form="blueprints" value="" style="display: none" />
+
+        {% elseif mode == 'review' %} {# review titlebar #}
+
+            {{ preview_link|raw }}
+
+            {% if exists and jira %}
+                <a class="button" href="#modal-decline" data-remodal-target="modal-decline" title="{{ "Änderungen ablehnen" }}"><i class="fa fa-fw fa-edit" style="font-size:16px;margin-right:0;"></i>Ablehnen</a>
+            {% endif %}
+            
+            <div class="button-group">
+                <button onclick="document.getElementById('fireTransition').value = 'publish'" class="button" name="task" value="save" form="blueprints" type="submit"><i class="fa fa-check"></i> {{ "Veröffentlichen"|tu }}</button>
+                {% if exists and admin.multilang %}
+                    {% if context.untranslatedLanguages %}
+                        <button type="button" class="button dropdown-toggle" data-toggle="dropdown">
+                            <i class="fa fa-caret-down"></i>
+                        </button>
+                        <ul class="dropdown-menu lang-switcher">
+                            {% for langCode in context.untranslatedLanguages %}
+                                {% set langName = admin.siteLanguages[langCode] %}
+                                {% if langCode != page_lang %}
+                                    <li><button class="button task" name="task" value="saveas" lang="{{langCode}}" form="blueprints" type="submit">{{ "PLUGIN_ADMIN.SAVE_AS"|tu }} {{ langName[:1]|upper ~ langName[1:] }}</button>
+                                {% endif %}
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                {% endif %}
+            </div>
+            <input type="text" id="fireTransition" name="data[fireTransition]" form="blueprints" value="" style="display: none" />
+        {% endif %}
+    </div>
+    {% if mode == 'new' %}
+        <h1><i class="fa fa-fw fa-file-text-o"></i> {{ "PLUGIN_ADMIN.ADD_PAGE"|tu }}</h1>
+    {% elseif mode == 'edit' %}
+        <h1><i class="fa fa-fw fa-edit" title="{{ mode|titleize }}-Modus"></i> {{ context.menu }}
+            <small>
+                ({{ context.header.draft.issue.id }}: {{ issue_summary }})
+            </small>
+        </h1>
+    {% elseif mode == 'readonly' or mode == 'open' %}
+        <h1><i class="fa fa-fw fa-globe" title="{{ mode|titleize }}-Modus"></i>
+            {{ context.menu }}
+        </h1>
+    {% elseif mode == 'readonly-edit' %}
+        <h1><i class="fa fa-fw fa-lock" title="{{ mode|titleize }}-Modus"></i>
+            {{ context.header.draft.issue.id }}: {{ issue_summary }} <small>(Bearbeitung von  {{ context.header.draft.last_modified_by }})</small>
+        </h1>
+    {% elseif mode == 'review' %}
+        <h1><i class="fa fa-fw fa-flag-checkered" title="{{ mode|titleize }}-Modus"></i>
+            {{ context.header.draft.issue.id }}: {{ issue_summary }} <small>(Bearbeitet von {{ context.header.draft.last_modified_by }})</small>
+        </h1>
+    {% elseif mode == 'readonly-review' %}
+        <h1><i class="fa fa-fw fa-lock" title="{{ mode|titleize }}-Modus"></i>
+            {{ context.header.draft.issue.id }}: {{ issue_summary }} <small>(Überprüfung von {{ context.header.draft.assignee }})</small>
+        </h1>
+    {% else %}
+        <h1><i class="fa fa-fw fa-file-text-o"></i> {{ "PLUGIN_ADMIN.MANAGE_PAGES"|tu }}</h1>
+    {% endif %}
+{% endblock %}
+
+{##}
+{### Set contents #}
+{##}
+
+{% block content %}
+    <div class="clear admin-pages">
+    {% if mode == 'new_' %} {# new content #}
+        {% include 'partials/blueprints-new.html.twig' with { blueprints: admin.blueprints('pages/page'), data: context } %}
+    {% elseif mode == 'edit' %} {# edit content #}
+        <div class="admin-form-wrapper">
+            {% block admin_topbar %}
+            <div id="admin-topbar">
+
+                {% block page_lang %}
+                {% if admin.multilang and page_lang %}
+                    <div id="admin-lang-toggle" class="button-group">
+                        <button type="button" class="button disabled">
+                            {% if exists %}
+                                {{ page_lang }}
+                            {% else %}
+                                {{ admin_lang }}
+                            {% endif %}
+                        </button>
+                        {% if exists and context.translatedLanguages|length > 1 %}
+                            <button type="button" class="button dropdown-toggle" data-toggle="dropdown">
+                                <i class="fa fa-caret-down"></i>
+                            </button>
+                            <ul class="dropdown-menu language-switcher">
+                                {% for language, route in context.translatedLanguages %}
+                                    {% if language != page_lang %}
+                                    <li><button class="task" name="task" value="switchlanguage" lang="{{language}}" redirect="{{context.rawRoute|trim('/')}}" form="blueprints">{{ language }}</button>
+                                    {% endif %}
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                {% endif %}
+                {% endblock page_lang %}
+            </div>
+            {% endblock admin_topbar %}
+
+            {% if context.blueprints.fields %}
+                {% if group_editor %}
+                    {% include 'partials/blueprints.html.twig' with { blueprints: admin.blueprints('admin/modes/editor'), data: context } %}
+                {% else %}
+                    {% include 'partials/blueprints.html.twig' with { blueprints: context.blueprints, data: context } %}
+                {% endif %}
+            {% endif %}        
+
+            {% if context.header.draft.issue.message %}
+            <form>
+                <div class="form-field">
+                    <h5>Hinweis:</h5><p class="bigger">{{ context.header.draft.issue.message|raw }}</p>
+                </div>
+            </form>
+            {% endif %}
+        </div>
+
+    {% elseif mode == 'readonly' %} {# readonly content #}
+    
+        {% if context.blueprints.fields %}
+        <div class="admin-form-wrapper">
+            {{ block('admin_topbar') }}
+            {% include 'partials/blueprints.html.twig' with { blueprints: admin.blueprints('admin/modes/readonly'), data: context } %}                  
+        </div>
+        {% endif %}
+    
+    {% elseif mode == 'readonly-edit' or mode == 'readonly-review' or mode == 'open' %}
+    
+        {% if context.blueprints.fields %}
+        <div class="admin-form-wrapper">
+            {{ block('admin_topbar') }}
+            {% include 'partials/blueprints.html.twig' with { blueprints: admin.blueprints('admin/modes/readonly_draft'), data: context } %}
+        </div>
+        {% endif %}
+
+    {% elseif mode == 'review' %} {# review content #}
+    
+        {% if context.blueprints.fields %}
+        <div class="admin-form-wrapper">
+            {{ block('admin_topbar') }}
+            {% include 'partials/blueprints.html.twig' with { blueprints: admin.blueprints('admin/modes/review'), data: context } %}
+        </div>
+        {% endif %}
+
+    {% else %} {# list content #}
+
+            <form id="page-filtering">
+                <div class="page-filters">
+                    <input type="text" data-filter-labels="{{ [{'id': 'mode', 'name': 'PLUGIN_ADMIN.PAGE_MODES'|tu}, {'id': 'type', 'name': 'PLUGIN_ADMIN.PAGE_TYPES'|tu}, {'id': 'access', 'name': 'PLUGIN_ADMIN.ACCESS_LEVELS'|tu}] |json_encode|e('html_attr')}}" data-filter-types="{{ admin.types|merge(admin.modularTypes)|json_encode|e('html_attr') }}" data-filter-access-levels="{{ admin.accessLevels|json_encode|e('html_attr') }}" placeholder="{{ "PLUGIN_ADMIN.ADD_FILTERS"|tu }}" class="page-filter" name="page-filter" />
+                </div>
+                <div class="page-search">
+                    <input type="text" placeholder="{{ "PLUGIN_ADMIN.SEARCH_PAGES"|tu }}" name="page-search" />
+                </div>
+                <div class="page-shortcuts">
+                    <span class="button button-x-small" data-page-toggleall="expand"><i class="fa fa-fw fa-plus-circle"></i> {{ "PLUGIN_ADMIN.EXPAND_ALL"|tu }}</span>
+                    <span class="button button-x-small" data-page-toggleall="collapse"><i class="fa fa-fw fa-minus-circle"></i> {{ "PLUGIN_ADMIN.COLLAPSE_ALL"|tu }}</span>
+                </div>
+            </form>
+            <div class="pages-list">
+                <ul class="depth-0">
+                    {{ _self.loop(pages, 0, _context) }}
+                </ul>
+                {% include 'partials/page-legend.html.twig' %}
+            </div>
+
+    {% endif %}
+        {% if context.header.draft.issue.message %}
+        <form>
+            <div class="form-field">
+                <h5>Hinweis:</h5><p class="bigger">{{ context.header.draft.issue.message|raw }}</p>
+            </div>
+        </form>
+        {% endif %}
+    </div>
+
+{##}
+{### Set modal windows #}
+{##}
+
+    {% if context %}
+        {% set obj_data = clone(context) %}
+
+        {% if mode == 'edit' %}
+            {% do obj_data.folder('') %}
+        {% endif %}
+    {% endif %}
+
+    {% if mode == 'list' %} {# list modals #}
+    <div class="remodal" data-remodal-id="modal" data-remodal-options="hashTracking: false">
+        {% include 'partials/blueprints-new.html.twig' with { blueprints: admin.blueprints('admin/pages/new'), data: obj_data, form_id:'new-page' } %}
+    </div>
+
+    <div class="remodal" data-remodal-id="modal-folder" data-remodal-options="hashTracking: false">
+        {% include 'partials/blueprints-new-folder.html.twig' with { blueprints: admin.blueprints('admin/pages/new_folder'), data: obj_data, form_id:'new-folder' } %}
+    </div>
+
+    <div class="remodal" data-remodal-id="modular" data-remodal-options="hashTracking: false">
+        {% include 'partials/blueprints-new.html.twig' with { blueprints: admin.blueprints('admin/pages/modular_new'), data: obj_data, form_id:'new-modular' } %}
+    </div>
+
+    {% for key, add_modal in config.plugins.admin.add_modals %}
+        <div class="remodal {{ add_modal.modal_classes|defined('') }}" data-remodal-id="modal-add_modal-{{ key }}" data-remodal-options="hashTracking: false">
+            {% include add_modal.template|defined('partials/blueprints-new.html.twig') with { blueprints: admin.blueprints(add_modal.blueprint), data: context, form_id:'add-modal' }|merge(add_modal.with|defined({})) %}
+        </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if mode == 'edit' %} {# edit modals #}
+    <div class="remodal" data-remodal-id="move" data-remodal-options="hashTracking: false">
+        {% include 'partials/page-move.html.twig' with { blueprints: admin.blueprints('admin/pages/move'), data: context } %}
+    </div>
+    <div class="remodal" data-remodal-id="revisions" data-remodal-options="hashTracking: false">
+        {% include ['partials/page-revisions.html.twig', 'empty.html.twig'] ignore missing with { data: context } %}
+    </div>
+    {% endif %}
+
+    {% include 'partials/modal-changes-detected.html.twig' %}
+
+    {% if jira and context %}
+
+        {% if mode == 'edit' and transition != 'new' %}
+
+        {# review modal #}
+        <div class="remodal" data-remodal-id="modal-review" data-remodal-options="hashTracking: false">
+            <form>
+                <h1>{{ context.header.draft.issue.id }}: {{ issue_summary }}</h1>
+            </form>
+
+            {% include 'partials/blueprints-raw.html.twig' with { blueprints: admin.blueprints('admin/modals/review'), data: context, form_id: 'jira_blueprints' } %}
+
+            <form>
+                <div class="button-bar">
+                    <button data-remodal-action="cancel" class="button secondary remodal-cancel"><i class="fa fa-fw fa-close"></i> {{ "PLUGIN_ADMIN.CANCEL"|tu }}</button>
+                    <button onclick="document.getElementById('fireTransition').value = 'review'" name="task" value="save" form="blueprints" type="submit" class="button"><i class="fa fa-check"></i> {{ "PLUGIN_ADMIN.CONTINUE"|tu }}</button>
+                </div>
+            </form>
+        </div>
+
+        {% endif %}
+
+        {% if mode == 'review' or mode == 'readonly-review' %}
+
+        {# decline modal #}
+        <div class="remodal" data-remodal-id="modal-decline" data-remodal-options="hashTracking: false">
+            <form>
+                <h1>{{ context.header.draft.issue.id }}: {{ issue_summary }}</h1>
+            </form>
+
+            {% include 'partials/blueprints.html.twig' with { blueprints: admin.blueprints('admin/modals/decline'), data: context, form_id: 'decline_blueprints' } %}
+
+            <form>
+                <div class="button-bar">
+                    <button data-remodal-action="cancel" class="button secondary remodal-cancel"><i class="fa fa-fw fa-close"></i> {{ "PLUGIN_ADMIN.CANCEL"|tu }}</button>
+                    <button onclick="document.getElementById('fireTransition').value = 'decline'" name="task" value="save" form="blueprints" type="submit" class="button"><i class="fa fa-check"></i> {{ "PLUGIN_ADMIN.CONTINUE"|tu }}</button>
+                </div>
+            </form>
+        </div>
+
+        {% endif %}
+
+        {% if mode == 'readonly' or mode == 'open' %}
+            
+            {% if mode == 'open' %}
+                {% set transition_value = 'continue' %}
+            {% else %}
+                {% set transition_value = 'edit' %}
+            {% endif %}
+            
+        
+        <div class="remodal" data-remodal-id="modal-continue" data-remodal-options="hashTracking: false">
+            <form>
+                <h1>{{ "Bitte einen Jira Vorgang wählen" }}</h1>
+            </form>
+
+            {% include 'partials/blueprints-raw.html.twig' with { blueprints: admin.blueprints('admin/modals/edit'), name: transition, data: context, form_id: 'jira_blueprints' } %}
+            
+            <form form="blueprints">
+                <div class="button-bar">
+                    <button data-remodal-action="cancel" class="button secondary remodal-cancel"><i class="fa fa-fw fa-close"></i> {{ "PLUGIN_ADMIN.CANCEL"|tu }}</button>
+                    <button onclick="document.getElementById('fireTransition').value = '{{ transition_value }}'" name="task" value="save" form="blueprints" type="submit" class="button"><i class="fa fa-check"></i> {{ "PLUGIN_ADMIN.CONTINUE"|tu }}</button>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+
+        {% if mode == 'edit' %}  
+        {# reset modal #}
+        <div class="remodal" data-remodal-id="modal-reset" data-remodal-options="hashTracking: false">
+            <form>
+                <h1>{{ "PLUGIN_TECART_REVIEW_WORKFLOW.RESET"|tu }}: {{ "PLUGIN_TECART_REVIEW_WORKFLOW.RESTORE_LIVE_VERSION"|tu }}</h1>
+                <p>{{ "PLUGIN_TECART_REVIEW_WORKFLOW.DISCARD_ALL_CHANGES"|tu }}</p>
+            </form>
+
+            <form form="blueprints">
+                <div class="button-bar">
+                    <button data-remodal-action="cancel" class="button secondary remodal-cancel"><i class="fa fa-fw fa-close"></i> {{ "PLUGIN_ADMIN.CANCEL"|tu }}</button>
+                    <button onclick="document.getElementById('fireTransition').value = 'reset'" name="task" value="save" form="blueprints" type="submit" class="button"><i class="fa fa-check"></i> {{ "PLUGIN_ADMIN.CONTINUE"|tu }}</button>
+                </div>
+            </form>
+        </div>
+
+        {# delete modal #}
+        <div class="remodal" data-remodal-id="delete" data-remodal-options="hashTracking: false">
+            <form>
+                <h1>{{ "PLUGIN_ADMIN.MODAL_DELETE_PAGE_CONFIRMATION_REQUIRED_TITLE"|tu }}</h1>
+                <p class="bigger">
+                    {% if context %}
+                        <strong>{{ "PLUGIN_ADMIN.PAGE"|tu }}: {{ context.title }}</strong>
+                    {% endif %}
+                </p>
+                <p class="bigger">
+                {{ "PLUGIN_ADMIN.MODAL_DELETE_PAGE_CONFIRMATION_REQUIRED_DESC"|tu }}
+                </p>
+                <br>
+                <div class="button-bar">
+                    <button data-remodal-action="cancel" class="button secondary remodal-cancel"><i class="fa fa-fw fa-close"></i> {{ "PLUGIN_ADMIN.CANCEL"|tu }}</button>
+                    <a class="button disable-after-click" data-delete-action href="#"><i class="fa fa-fw fa-check"></i> {{ "PLUGIN_ADMIN.CONTINUE"|tu }}</a>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+    {% endif %}
+
+    {% include 'partials/admin-pro-pages-addons.html.twig' ignore missing %}
+
+{% endblock %}
+
+{##}
+{### Set bottom block #}
+{##}
+
+{% block bottom %}
+<script>
+    $('.admin-pages .form-tabs .tabs-nav').css('margin-right', ($('#admin-topbar').width() + 20) + 'px');
+</script>
+{% endblock %}

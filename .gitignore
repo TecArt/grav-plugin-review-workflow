@@ -1,0 +1,15 @@
+# Jetbrains
+.idea
+
+# Bower Components
+components/codemirror/*
+!components/codemirror/lib
+!components/codemirror/mode
+!components/codemirror/addon
+!components/codemirror/theme
+components/google-diff-match-patch-js/*.*
+!components/google-diff-match-patch-js/diff_match_patch.js
+components/js-base64/*.*
+!components/js-base64/base64.min.js
+
+

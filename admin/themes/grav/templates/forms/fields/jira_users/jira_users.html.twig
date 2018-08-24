@@ -1,0 +1,37 @@
+{% extends "forms/field.html.twig" %}
+
+{% set value = (value is null ? field.default|tu : value) %}
+
+{% if grav.admin.user.groups %}
+    {% set editor = in_array(config.plugins['tecart-review-workflow'].editors, grav.admin.user.groups) %}
+{% endif %}
+
+{% block global_attributes %}
+    data-grav-jira_users="{{ (field.jira_users is defined ? field.jira_users : {})|json_encode()|e('html_attr') }}"
+    data-grav-selectize="true"
+    data-grav-field="false"
+    {{ parent() }}
+{% endblock %}
+
+{% block input %}
+
+    <div class="form-select-wrapper {{ field.size }}">
+        <select class="{{ field.classes }} selectized" tabindex="-1" value="{{ value }}" name="{{ (scope ~ field.name)|fieldName ~ (field.multiple ? '[]' : '') }}"
+            {% if field.autofocus in ['on', 'true', 1] %}autofocus="autofocus"{% endif %}
+            {% if field.placeholder %}placeholder="{{ field.placeholder|tu }}"{% endif %}
+            {% if field.novalidate in ['on', 'true', 1] %}novalidate="novalidate"{% endif %}
+            {% if field.validate.required in ['on', 'true', 1] %}required="required"{% endif %}
+            {% if field.multiple in ['on', 'true', 1] %}multiple="multiple"{% endif %}
+            {% if field.disabled or isDisabledToggleable %}disabled="disabled"{% endif %}
+            {% if field.form %}form="{{ field.form }}"{% endif %}
+            >
+            <option value=""></option>
+            {% for jira_user in grav.twig.jira_users %}
+                {% if grav.admin.user.username != jira_user.key or not editor %}
+                <option value="{{ jira_user.key }}">{{ jira_user.displayName }}</option>
+                {% endif %}
+            {% endfor %}
+        </select>
+    </div>
+
+{% endblock %}

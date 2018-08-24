@@ -1,0 +1,25 @@
+{% extends "forms/field.html.twig" %}
+
+{% block global_attributes %}
+    data-grav-issues="{{ (field.issues is defined ? field.issues : {})|json_encode()|e('html_attr') }}"
+    data-grav-field="select"
+    {{ parent() }}
+{% endblock %}
+
+{% block field %}
+
+<div class="button-group">
+    <div class="form-data full" data-grav-field="false" data-grav-selectize="true" style="width:300px;text-align:left;">
+        <select id="selectIssue" name="data[header][draft][issue][id]" form="blueprints" required="required">
+            <option value="">{{ "PLUGIN_TECART_REVIEW_WORKFLOW.SELECT_ISSUE"|tu }}</option>
+            {% for issue in grav.twig.issues %}
+                {% if (issue.fields.status.id <= 4) and (issue.fields.assignee.key == grav.admin.user.username) %} {# TODO: klarere Definitionen #}
+                    <option {% if context.header.draft.issue.id|contains(issue.key) %}selected="selected"{% endif %}
+                        value="{{ issue.key }}">{{ issue.key }}: {{ issue.fields.summary|truncate(33)|raw }}</option>
+                {% endif %}
+            {% endfor %}
+        </select>
+    </div>
+</div>
+
+{% endblock %}

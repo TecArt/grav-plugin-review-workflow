@@ -1,0 +1,53 @@
+title: PLUGIN_ADMIN.MODULAR
+extends@: default
+
+form:
+  fields:
+    tabs:
+      type: tabs
+      active: 1
+      fields:
+
+        content:
+          type: tab
+          title: PLUGIN_ADMIN.CONTENT
+
+          fields:
+            header.title:
+              type: hidden
+            content:
+              type: hidden
+
+            header.draft.title:
+              type: text
+              autofocus: true
+              style: vertical
+              label: PLUGIN_ADMIN.TITLE
+
+            header.draft.content:
+              type: editor
+              validate:
+                type: textarea
+
+            header.draft.issue.id:
+              type: hidden
+            header.draft.issue.summary:
+              type: hidden
+            header.draft.last_modified_by:
+              type: hidden
+
+        comparison:
+          type: tab
+          title: PLUGIN_TECART_REVIEW_WORKFLOW.COMPARISON
+          fields:
+
+            header.draft.content:
+              readonly: true
+              type: review
+              label: PLUGIN_TECART_REVIEW_WORKFLOW.REVIEW
+
+        options:
+          type: hidden
+          
+        advanced:
+          type: hidden

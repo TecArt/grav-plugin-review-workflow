@@ -1,0 +1,246 @@
+{% set value = (value is null ? field.default|tu : value) %}
+
+{% set draft    = {frontmatter: context.header.draft.review, content: context.header.draft.content|markdown } %}
+{% set original = {frontmatter: context.review, content: context.rawMarkdown|markdown } %}
+
+{% block field %}
+
+<div class="form-field grid vertical">
+    <div class="form-label">Titel:</div>
+    <div id="cm_title" class="form-data grav-reviewer grav-editor-merge">
+        <div class="grav-editor-content is-active">
+            <div id='view_title'></div>
+        </div>
+    </div>
+</div>
+
+<div class="form-field grid vertical">
+    <div class="form-label">Inhalt:</div>
+    <div id="cm_content" class="form-data grav-reviewer grav-editor-merge">
+        <div class="grav-editor-content is-active">
+            <div id='view_content'></div>
+        </div>
+        <div class="grav-editor-merge-resizer"></div>
+    </div>
+</div>
+
+<div class="form-field grid vertical">
+    <div class="form-label">Metadaten:</div>
+    <div id="cm_meta" class="form-data grav-reviewer grav-editor-merge">
+        <div class="grav-editor-content is-active">
+            <div id='view_meta'></div>
+        </div>
+    </div>
+</div>
+
+<div class="form-field grid vertical">
+    <div class="form-label">Zu überprüfende Variablen:</div>
+    <div id="cm_variables" class="form-data grav-reviewer grav-editor-merge">
+        <div class="grav-editor-content is-active">
+            <div id='view_variables'></div>
+        </div>
+        <div class="grav-editor-merge-resizer"></div>
+    </div>
+</div>
+
+<div class="form-field grid vertical">
+    <div class="form-data" style="margin-bottom:22px;">
+        <span class="button button-x-small" onclick="toggleDifferences();">{{ "PLUGIN_TECART_REVIEW_WORKFLOW.ACTIVATE"|tu }}</span>
+        <span class="button button-x-small" onclick="connect = connect ? null : 'align'; initUI()">{{ "PLUGIN_TECART_REVIEW_WORKFLOW.CONNECT"|tu }}</span>
+        <span class="button button-x-small" onclick="collapse = !collapse; initUI()">{{ "PLUGIN_TECART_REVIEW_WORKFLOW.COLLAPSE"|tu }}</span>
+        <span class="button button-x-small" onclick="lineWrapping = !lineWrapping; initUI()">{{ "PLUGIN_TECART_REVIEW_WORKFLOW.LINE_WRAPPING"|tu }}</span>
+    </div>
+</div>
+
+<style>
+    .grav-editor-merge .grav-editor-merge-resizer { height: 6px; cursor: row-resize; border-radius: 0 0 3px 3px; margin-top: -2; position: relative; z-index: 1; }
+    .grav-editor-merge-resizer { background-color: #d5d5d5; background-image: -webkit-linear-gradient(top, #d5d5d5 0%,#d5d5d5 20%,#ededed 20%,#ededed 40%,#d5d5d5 40%,#d5d5d5 60%,#ededed 60%,#ededed 80%,#d5d5d5 80%,#d5d5d5 100%); background-image: linear-gradient(to bottom,#d5d5d5 0%,#d5d5d5 20%,#ededed 20%,#ededed 40%,#d5d5d5 40%,#d5d5d5 60%,#ededed 60%,#ededed 80%,#d5d5d5 80%,#d5d5d5 100%); }
+    .CodeMirror-merge-r-inserted, .CodeMirror-merge-l-inserted { background: rgb(202, 252, 194); }
+    .CodeMirror-merge-r-deleted, .CodeMirror-merge-l-deleted { background: rgb(247, 220, 220); }
+    
+    #view_title { border-bottom: 2px solid #ddd}
+    #view_title .CodeMirror-merge { height:3em!important;}
+    #view_title .CodeMirror { height:3em!important; }
+
+    #view_content, #view_variables { border-bottom: 2px solid #ddd}
+    #view_content .CodeMirror-merge, #view_variables .CodeMirror-merge { min-height:5em!important;}
+    #view_content .CodeMirror, #view_variables .CodeMirror { min-height:5em!important; }
+</style>
+
+<script>
+
+    // Base64 Decoder
+    function b64DecodeUnicode(str) {
+        // Going backwards: from bytestream, to percent-encoding, to original string.
+        return decodeURIComponent(atob(str).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+    }
+
+    // CodeMirror
+    var dvContent, dvTitle, dvVariables, dvMeta, highlight = true, connect = null, collapse = false, lineWrapping = true;
+
+    function initUI() {
+      
+        if (draft_content == null) return;
+        
+        var targetTitle = document.getElementById("view_title");
+        var targetContent = document.getElementById("view_content");
+        var targetMeta = document.getElementById("view_meta");
+        var targetVariables = document.getElementById("view_variables");
+        
+        targetTitle.innerHTML = "";
+        targetContent.innerHTML = "";
+        targetMeta.innerHTML = "";
+        targetVariables.innerHTML = "";
+
+        dvTitle = CodeMirror.MergeView(targetTitle, {
+            value: draft_title,
+            orig: orig_title,
+            lineNumbers: true,
+            mode: "htmlmixed",
+            connect: connect,
+            revertButtons: false,
+            readOnly: "nocursor",
+            autoRefresh: true,
+            chunkClassLocation: ['background', 'gutter']
+        });
+
+        dvContent = CodeMirror.MergeView(targetContent, {
+            value: draft_content,
+            orig: orig_content,
+            lineNumbers: true,
+            mode: "htmlmixed",
+            connect: connect,
+            collapseIdentical: collapse,
+            revertButtons: false,
+            lineWrapping: lineWrapping,
+            readOnly: "nocursor",
+            autoRefresh: true,
+            chunkClassLocation: ['background', 'gutter']
+        });
+
+        dvMeta = CodeMirror.MergeView(targetMeta, {
+            value: draft_meta,
+            orig: orig_meta,
+            lineNumbers: true,
+            mode: "markdown",
+            matchBrackets: true,
+            autoCloseBrackets: true,
+            connect: connect,
+            collapseIdentical: collapse,
+            revertButtons: false,
+            lineWrapping: lineWrapping,
+            readOnly: "nocursor",
+            autoRefresh: true,
+            chunkClassLocation: ['background', 'gutter']
+        });
+
+        dvVariables = CodeMirror.MergeView(targetVariables, {
+            value: draft_variables,
+            orig: orig_variables,
+            lineNumbers: true,
+            mode: "markdown",
+            matchBrackets: true,
+            autoCloseBrackets: true,
+            connect: connect,
+            collapseIdentical: collapse,
+            revertButtons: false,
+            lineWrapping: lineWrapping,
+            readOnly: "nocursor",
+            autoRefresh: true,
+            chunkClassLocation: ['background', 'gutter']
+        });
+
+    }
+    
+    function toggleDifferences() {
+        dvContent.setShowDifferences(highlight = !highlight);
+        dvTitle.setShowDifferences(highlight);
+        dvMeta.setShowDifferences(highlight);
+        dvVariables.setShowDifferences(highlight);
+    }
+    
+    window.onload = function() {
+        
+        draft_title     = '{{ context.header.draft.title|raw }}';
+        draft_content   = Base64.decode('{{ draft.content|base64_encode }}');
+        draft_meta      = Base64.decode('{{ print_r(context.header.draft.metadata, true)|base64_encode }}');
+        draft_variables = Base64.decode('{{ print_r(context.header.draft.review, true)|base64_encode }}');
+
+        orig_title      = '{{ context.header.title|raw }}';
+        orig_content    = Base64.decode('{{ original.content|base64_encode }}');
+        orig_meta      =  Base64.decode('{{ print_r(context.header.metadata, true)|base64_encode }}');
+        orig_variables  = Base64.decode('{{ print_r(context.header.review, true)|base64_encode }}');
+
+        initUI();
+        
+        let d = document.createElement("div"); d.style.cssText = "width: 50px; margin: 7px; height: 14px"; 
+        
+        dvContent.editor().addLineWidget(57, d);
+        dvTitle.editor().addLineWidget(57, d);
+        dvMeta.editor().addLineWidget(57, d);
+        dvVariables.editor().addLineWidget(57, d);
+
+    };
+    
+    // CodeMirror Resizer
+    var divContent1     = document.getElementById("cm_content"),
+        targetContent1  = document.getElementById("view_content"),
+        contentWindow1  = targetContent1.getElementsByClassName("CodeMirror-merge"),
+        contentWindows1 = targetContent1.getElementsByClassName("CodeMirror"),
+        resizer1        = divContent1.getElementsByClassName("grav-editor-merge-resizer")[0],
+
+        divContent2     = document.getElementById("cm_variables"),
+        targetContent2  = document.getElementById("view_variables"),
+        contentWindow2  = targetContent2.getElementsByClassName("CodeMirror-merge"),
+        contentWindows2 = targetContent2.getElementsByClassName("CodeMirror"),
+        resizer2        = divContent2.getElementsByClassName("grav-editor-merge-resizer")[0];
+    
+
+    resizer1.addEventListener('mousedown', initResize1, false);
+    resizer2.addEventListener('mousedown', initResize2, false);
+
+    function initResize1(e) {
+        window.addEventListener('mousemove', Resize1, false);
+        window.addEventListener('mouseup', stopResize1, false);
+        console.log('success: initResize1');
+    }
+
+    function initResize2(e) {
+        window.addEventListener('mousemove', Resize2, false);
+        window.addEventListener('mouseup', stopResize2, false);
+        console.log('success: initResize2');
+    }
+
+    function Resize1(e) {
+        offset = $("#view_content").offset().top;
+        contentWindow1[0].style.height = (e.clientY - offset) + 'px';
+        for (i = 0; i < contentWindows1.length; i++) { 
+            contentWindows1[i].style.height = (e.clientY - offset) + 'px'; 
+        }
+    }
+
+    function Resize2(e) {
+        offset = $("#view_variables").offset().top;
+        contentWindow2[0].style.height = (e.clientY - offset) + 'px';
+        for (i = 0; i < contentWindows2.length; i++) { 
+            contentWindows2[i].style.height = (e.clientY - offset) + 'px';    
+        }
+    }
+
+    function stopResize1(e) {
+        window.removeEventListener('mousemove', Resize1, false);
+        window.removeEventListener('mouseup', stopResize1, false);
+        console.log('success: stopResize1');
+    }
+
+    function stopResize2(e) {
+        window.removeEventListener('mousemove', Resize2, false);
+        window.removeEventListener('mouseup', stopResize2, false);
+        console.log('success: stopResize2');
+    }
+
+</script>
+
+{% endblock %}

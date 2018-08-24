@@ -1,0 +1,20 @@
+form:
+  validation: loose
+  fields:
+
+    assignee:
+      type: jira_users
+      label: PLUGIN_TECART_REVIEW_WORKFLOW.ASSIGNEE
+      placeholder: PLUGIN_TECART_REVIEW_WORKFLOW.SELECT_ASSIGNEE
+      form: 'blueprints'
+      validate:
+        required: true
+        message: PLUGIN_TECART_REVIEW_WORKFLOW.SELECT_ASSIGNEE_FOR
+        
+    issue_message:
+      type: ta_textarea
+      form: 'blueprints'
+      label: 'Nachricht'
+    
+    blueprint:
+      type: blueprint
